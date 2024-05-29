@@ -83,7 +83,7 @@ def paint_history():
 def format_docs(docs):
     return "\n\n".join(document.page_content for document in docs)
 
-
+# 채팅 모델이 아니기 떄문에 String 형태로 프롬프트 수정
 prompt = ChatPromptTemplate.from_template(
     """Answer the question using ONLY the following context and not your training data. If you don't know the answer just say you don't know. DON'T make anything up.
     

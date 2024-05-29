@@ -1,4 +1,4 @@
-from langchain.prompts import ChatPromptTemplate
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.document_loaders import UnstructuredFileLoader
 from langchain.embeddings import CacheBackedEmbeddings, OpenAIEmbeddings
 from langchain.schema.runnable import RunnableLambda, RunnablePassthrough
@@ -7,6 +7,7 @@ from langchain.text_splitter import CharacterTextSplitter
 from langchain.vectorstores.faiss import FAISS
 from langchain.chat_models import ChatOpenAI
 from langchain.callbacks.base import BaseCallbackHandler
+from langchain.memory import ConversationSummaryBufferMemory
 import streamlit as st
 
 st.set_page_config(
@@ -28,15 +29,16 @@ class ChatCallbackHandler(BaseCallbackHandler):
         self.message += token
         self.message_box.markdown(self.message)
 
-
 llm = ChatOpenAI(
-    temperature=0.1,
-    streaming=True,
-    callbacks=[
-        ChatCallbackHandler(),
-    ],
-)
+        temperature=0.1,
+        streaming=True,
+        callbacks=[ChatCallbackHandler()],
+    )
 
+llm_for_memory = ChatOpenAI(
+        temperature=0.1,
+        streaming=True,
+    )
 
 @st.cache_data(show_spinner="Embedding file...")
 def embed_file(file):
@@ -83,6 +85,12 @@ def format_docs(docs):
     return "\n\n".join(document.page_content for document in docs)
 
 
+def save_memory(input, output):
+    st.session_state["memory"].save_context({"input": input}, {"output": output})
+
+def load_memory(_):
+    return memory_tmp.load_memory_variables({})["history"]
+
 prompt = ChatPromptTemplate.from_messages(
     [
         (
@@ -93,6 +101,7 @@ prompt = ChatPromptTemplate.from_messages(
             Context: {context}
             """,
         ),
+        MessagesPlaceholder(variable_name="history"),
         ("human", "{question}"),
     ]
 )
@@ -123,17 +132,24 @@ if file:
     message = st.chat_input("Ask anything about your file...")
     if message:
         send_message(message, "human")
+        memory_tmp = st.session_state["memory"]
         chain = (
             {
                 "context": retriever | RunnableLambda(format_docs),
                 "question": RunnablePassthrough(),
+                "history": RunnableLambda(load_memory),
             }
             | prompt
             | llm
         )
         with st.chat_message("ai"):
-            chain.invoke(message)
-
+            response = chain.invoke(message)
+            save_memory(message, response.content)
 
 else:
     st.session_state["messages"] = []
+    st.session_state["memory"] = ConversationSummaryBufferMemory(
+        llm=llm_for_memory,
+        max_token_limit=500,
+        return_messages=True,
+    )
