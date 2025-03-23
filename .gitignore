@@ -6,3 +6,4 @@ files/
 .DS_Store
 falcon.bin
 __pycache__
+notebook_for_blog.ipynb
