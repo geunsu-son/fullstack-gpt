@@ -129,15 +129,11 @@ if file and openai_api_key:
             ("human", "{question}"),
         ]
     )
-    if "messages" not in st.session_state:
-        st.session_state["messages"] = []
-
     send_message("I'm ready! Ask away!", "ai", save=False)
     paint_history()
     message = st.chat_input("Ask anything about your file...")
     if message:
         send_message(message, "human")
-        memory_tmp = st.session_state["memory"]
         chain = (
             {
                 "context": retriever | RunnableLambda(format_docs),
