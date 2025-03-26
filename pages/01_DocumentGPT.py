@@ -106,7 +106,7 @@ with st.sidebar:
     file = st.file_uploader("Upload a .txt .pdf or .docx file", type=["pdf", "txt", "docx"])
 
 if file and openai_api_key:
-    retriever = embed_file(file)
+    retriever = embed_file(file, openai_api_key)
 
     llm = ChatOpenAI(
         temperature=0.1,
