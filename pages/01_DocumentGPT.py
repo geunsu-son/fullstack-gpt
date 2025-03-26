@@ -105,6 +105,7 @@ if file and openai_api_key:
             temperature=0.1,
             streaming=True,
             callbacks=[ChatCallbackHandler()],
+            openai_api_key=openai_api_key,
         )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -146,6 +147,7 @@ elif openai_api_key:
     llm_for_memory = ChatOpenAI(
             temperature=0.1,
             streaming=True,
+            openai_api_key=openai_api_key,
         )
     
     st.session_state["messages"] = []
