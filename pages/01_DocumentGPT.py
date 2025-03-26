@@ -93,6 +93,7 @@ Upload your files and enter your OpenAI API key on the sidebar.
 )
 
 with st.sidebar:
+    st.markdown("[🔗 Git Repo Link](https://github.com/geunsu-son/fullstack-gpt)")
     openai_api_key = st.text_input("Enter your OpenAI API key", type="password")
     file = st.file_uploader("Upload a .txt .pdf or .docx file", type=["pdf", "txt", "docx"])
 
