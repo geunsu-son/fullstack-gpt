@@ -9,6 +9,7 @@ from langchain.chat_models import ChatOpenAI
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain.memory import ConversationSummaryBufferMemory
 import streamlit as st
+import os
 
 st.set_page_config(
     page_title="DocumentGPT",
@@ -32,6 +33,11 @@ class ChatCallbackHandler(BaseCallbackHandler):
 @st.cache_data(show_spinner="Embedding file...")
 def embed_file(file):
     file_content = file.read()
+
+    # 디렉토리 미리 생성
+    os.makedirs("./.cache/files", exist_ok=True)
+    os.makedirs("./.cache/embeddings", exist_ok=True)
+
     file_path = f"./.cache/files/{file.name}"
     with open(file_path, "wb") as f:
         f.write(file_content)

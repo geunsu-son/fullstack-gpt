@@ -123,7 +123,7 @@ opencv-python==4.8.0.76
 openpyxl==3.1.2
 orjson==3.9.9
 overrides==7.4.0
-packaging==23.1
+packaging==23.1  
 pandas==2.1.0
 parso==0.8.3
 pathspec==0.11.2
