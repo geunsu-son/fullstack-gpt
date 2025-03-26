@@ -29,17 +29,6 @@ class ChatCallbackHandler(BaseCallbackHandler):
         self.message += token
         self.message_box.markdown(self.message)
 
-llm = ChatOpenAI(
-        temperature=0.1,
-        streaming=True,
-        callbacks=[ChatCallbackHandler()],
-    )
-
-llm_for_memory = ChatOpenAI(
-        temperature=0.1,
-        streaming=True,
-    )
-
 @st.cache_data(show_spinner="Embedding file...")
 def embed_file(file):
     file_content = file.read()
@@ -91,22 +80,6 @@ def save_memory(input, output):
 def load_memory(_):
     return memory_tmp.load_memory_variables({})["history"]
 
-prompt = ChatPromptTemplate.from_messages(
-    [
-        (
-            "system",
-            """
-            Answer the question using ONLY the following context. If you don't know the answer just say you don't know. DON'T make anything up.
-            
-            Context: {context}
-            """,
-        ),
-        MessagesPlaceholder(variable_name="history"),
-        ("human", "{question}"),
-    ]
-)
-
-
 st.title("DocumentGPT")
 
 st.markdown(
@@ -115,18 +88,38 @@ Welcome!
             
 Use this chatbot to ask questions to an AI about your files!
 
-Upload your files on the sidebar.
+Upload your files and enter your OpenAI API key on the sidebar.
 """
 )
 
 with st.sidebar:
-    file = st.file_uploader(
-        "Upload a .txt .pdf or .docx file",
-        type=["pdf", "txt", "docx"],
+    openai_api_key = st.text_input("Enter your OpenAI API key", type="password")
+    file = st.file_uploader("Upload a .txt .pdf or .docx file", type=["pdf", "txt", "docx"])
+
+if file and openai_api_key:
+    retriever = embed_file(file)
+
+    llm = ChatOpenAI(
+        temperature=0.1,
+        streaming=True,
+        callbacks=[ChatCallbackHandler()],
+        openai_api_key=openai_api_key,
     )
 
-if file:
-    retriever = embed_file(file)
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """
+                Answer the question using ONLY the following context. If you don't know the answer just say you don't know. DON'T make anything up.
+                
+                Context: {context}
+                """,
+            ),
+            MessagesPlaceholder(variable_name="history"),
+            ("human", "{question}"),
+        ]
+    )
     send_message("I'm ready! Ask away!", "ai", save=False)
     paint_history()
     message = st.chat_input("Ask anything about your file...")
@@ -148,8 +141,3 @@ if file:
 
 else:
     st.session_state["messages"] = []
-    st.session_state["memory"] = ConversationSummaryBufferMemory(
-        llm=llm_for_memory,
-        max_token_limit=500,
-        return_messages=True,
-    )
