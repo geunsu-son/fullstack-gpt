@@ -1,210 +1,21 @@
+import streamlit as st
 import json
+import os
+from langchain.chat_models import ChatOpenAI
+from langchain.prompts import PromptTemplate
 from langchain.document_loaders import UnstructuredFileLoader
 from langchain.text_splitter import CharacterTextSplitter
-from langchain.chat_models import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
-from langchain.callbacks import StreamingStdOutCallbackHandler
-import streamlit as st
 from langchain.retrievers import WikipediaRetriever
-from langchain.schema import BaseOutputParser, output_parser
 
-
-class JsonOutputParser(BaseOutputParser):
-    def parse(self, text):
-        text = text.replace("```", "").replace("json", "")
-        return json.loads(text)
-
-
-output_parser = JsonOutputParser()
-
-st.set_page_config(
-    page_title="QuizGPT",
-    page_icon="❓",
-)
-
+# Streamlit 설정
+st.set_page_config(page_title="QuizGPT", page_icon="❓")
 st.title("QuizGPT")
-
-llm = ChatOpenAI(
-    temperature=0.1,
-    model="gpt-3.5-turbo-1106",
-    streaming=True,
-    callbacks=[StreamingStdOutCallbackHandler()],
-)
-
-
-def format_docs(docs):
-    return "\n\n".join(document.page_content for document in docs)
-
-
-questions_prompt = ChatPromptTemplate.from_messages(
-    [
-        (
-            "system",
-            """
-    You are a helpful assistant that is role playing as a teacher.
-
-    Based ONLY on the following context make 10 (TEN) questions to test the user's knowledge about the text.
-
-    Each question should have 4 answers, three of them must be incorrect and one should be correct.
-
-    Use (o) to signal the correct answer.
-
-    Question examples:
-
-    Question: What is the color of the ocean?
-    Answers: Red|Yellow|Green|Blue(o)
-
-    Question: What is the capital or Georgia?
-    Answers: Baku|Tbilisi(o)|Manila|Beirut
-
-    Question: When was Avatar released?
-    Answers: 2007|2001|2009(o)|1998
-
-    Question: Who was Julius Caesar?
-    Answers: A Roman Emperor(o)|Painter|Actor|Model
-
-    Your turn!
-
-    Context: {context}
-""",
-        )
-    ]
-)
-
-questions_chain = {"context": format_docs} | questions_prompt | llm
-
-formatting_prompt = ChatPromptTemplate.from_messages(
-    [
-        (
-            "system",
-            """
-    You are a powerful formatting algorithm.
-
-    You format exam questions into JSON format.
-    Answers with (o) are the correct ones.
-
-    Example Input:
-
-    Question: What is the color of the ocean?
-    Answers: Red|Yellow|Green|Blue(o)
-
-    Question: What is the capital or Georgia?
-    Answers: Baku|Tbilisi(o)|Manila|Beirut
-
-    Question: When was Avatar released?
-    Answers: 2007|2001|2009(o)|1998
-
-    Question: Who was Julius Caesar?
-    Answers: A Roman Emperor(o)|Painter|Actor|Model
-
-
-    Example Output:
-
-    ```json
-    {{ "questions": [
-            {{
-                "question": "What is the color of the ocean?",
-                "answers": [
-                        {{
-                            "answer": "Red",
-                            "correct": false
-                        }},
-                        {{
-                            "answer": "Yellow",
-                            "correct": false
-                        }},
-                        {{
-                            "answer": "Green",
-                            "correct": false
-                        }},
-                        {{
-                            "answer": "Blue",
-                            "correct": true
-                        }}
-                ]
-            }},
-                        {{
-                "question": "What is the capital or Georgia?",
-                "answers": [
-                        {{
-                            "answer": "Baku",
-                            "correct": false
-                        }},
-                        {{
-                            "answer": "Tbilisi",
-                            "correct": true
-                        }},
-                        {{
-                            "answer": "Manila",
-                            "correct": false
-                        }},
-                        {{
-                            "answer": "Beirut",
-                            "correct": false
-                        }}
-                ]
-            }},
-                        {{
-                "question": "When was Avatar released?",
-                "answers": [
-                        {{
-                            "answer": "2007",
-                            "correct": false
-                        }},
-                        {{
-                            "answer": "2001",
-                            "correct": false
-                        }},
-                        {{
-                            "answer": "2009",
-                            "correct": true
-                        }},
-                        {{
-                            "answer": "1998",
-                            "correct": false
-                        }}
-                ]
-            }},
-            {{
-                "question": "Who was Julius Caesar?",
-                "answers": [
-                        {{
-                            "answer": "A Roman Emperor",
-                            "correct": true
-                        }},
-                        {{
-                            "answer": "Painter",
-                            "correct": false
-                        }},
-                        {{
-                            "answer": "Actor",
-                            "correct": false
-                        }},
-                        {{
-                            "answer": "Model",
-                            "correct": false
-                        }}
-                ]
-            }}
-        ]
-     }}
-    ```
-    Your turn!
-
-    Questions: {context}
-
-""",
-        )
-    ]
-)
-
-formatting_chain = formatting_prompt | llm
-
 
 @st.cache_data(show_spinner="Loading file...")
 def split_file(file):
     file_content = file.read()
     file_path = f"./.cache/quiz_files/{file.name}"
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
     with open(file_path, "wb") as f:
         f.write(file_content)
     splitter = CharacterTextSplitter.from_tiktoken_encoder(
@@ -216,66 +27,118 @@ def split_file(file):
     docs = loader.load_and_split(text_splitter=splitter)
     return docs
 
-
-@st.cache_data(show_spinner="Making quiz...")
-def run_quiz_chain(_docs, topic):
-    chain = {"context": questions_chain} | formatting_chain | output_parser
-    return chain.invoke(_docs)
-
-
 @st.cache_data(show_spinner="Searching Wikipedia...")
 def wiki_search(term):
     retriever = WikipediaRetriever(top_k_results=5)
     docs = retriever.get_relevant_documents(term)
     return docs
 
-
+# 사이드바 설정
 with st.sidebar:
+    st.markdown("[🔗 Git Repo Link](https://github.com/geunsu-son/fullstack-gpt)")
+    openai_api_key = st.text_input("Enter your OpenAI API key", type="password")
+    difficulty = st.selectbox("난이도를 선택하세요", ["Eazy", "Difficult"])
+    choice = st.selectbox("퀴즈 생성 방식 선택", ["Wikipedia", "파일 업로드"])
+
     docs = None
-    topic = None
-    choice = st.selectbox(
-        "Choose what you want to use.",
-        (
-            "File",
-            "Wikipedia Article",
-        ),
-    )
-    if choice == "File":
-        file = st.file_uploader(
-            "Upload a .docx , .txt or .pdf file",
-            type=["pdf", "txt", "docx"],
-        )
+    if choice == "파일 업로드":
+        file = st.file_uploader("파일을 업로드하세요 (.txt, .pdf, .docx)", type=["pdf", "txt", "docx"])
         if file:
             docs = split_file(file)
     else:
-        topic = st.text_input("Search Wikipedia...")
+        topic = st.text_input("Wikipedia에서 검색할 주제 입력")
         if topic:
             docs = wiki_search(topic)
 
+if not openai_api_key:
+    st.warning("Please enter your OpenAI API key in the sidebar")
+    st.stop()
 
 if not docs:
     st.markdown(
         """
-    Welcome to QuizGPT.
+        Welcome to QuizGPT.
 
-    I will make a quiz from Wikipedia articles or files you upload to test your knowledge and help you study.
+        I will make a quiz from Wikipedia articles or files you upload to test your knowledge and help you study.
 
-    Get started by uploading a file or searching on Wikipedia in the sidebar.
-    """
+        Get started by uploading a file or searching on Wikipedia in the sidebar.
+        """
     )
-else:
-    response = run_quiz_chain(docs, topic if topic else file.name)
-    with st.form("questions_form"):
-        st.write(response)
-        for question in response["questions"]:
-            st.write(question["question"])
-            value = st.radio(
-                "Select an option.",
-                [answer["answer"] for answer in question["answers"]],
-                index=None,
-            )
-            if {"answer": value, "correct": True} in question["answers"]:
-                st.success("Correct!")
-            elif value is not None:
-                st.error("Wrong!")
-        button = st.form_submit_button()
+    st.stop()
+
+# 퀴즈 생성 프롬프트
+quiz_prompt = PromptTemplate.from_template("Make a {difficulty} quiz based on the following context:\n{context}")
+
+# 함수 정의 및 LLM 바인딩
+quiz_function = {
+    "name": "create_quiz",
+    "description": "Generate quiz with specified difficulty level.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "questions": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "question": {"type": "string"},
+                        "answers": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "answer": {"type": "string"},
+                                    "correct": {"type": "boolean"},
+                                },
+                                "required": ["answer", "correct"],
+                            },
+                        },
+                    },
+                    "required": ["question", "answers"],
+                },
+            }
+        },
+        "required": ["questions"],
+    },
+}
+
+# LLM 설정
+llm = ChatOpenAI(api_key=openai_api_key, temperature=0.1).bind(
+    function_call={"name": "create_quiz"}, functions=[quiz_function]
+)
+
+quiz_chain = quiz_prompt | llm
+
+cache_dir = './.cache/quiz_files'
+os.makedirs(cache_dir, exist_ok=True)
+
+if "response_to_json" not in st.session_state:
+    context = "\n".join([doc.page_content for doc in docs])
+    response = quiz_chain.invoke({"difficulty": difficulty, "context": context})
+    st.session_state.response_to_json = json.loads(response.additional_kwargs["function_call"]["arguments"])
+
+cache_file_path = os.path.join(cache_dir, "latest_quiz.json")
+with open(cache_file_path, "w") as cache_file:
+    json.dump(st.session_state.response_to_json, cache_file, ensure_ascii=False, indent=4)
+
+with st.form("quiz_form"):
+    correct_answers = 0
+    for idx, question in enumerate(st.session_state.response_to_json["questions"]):
+        user_answer = st.radio(
+            f"{idx+1}. {question['question']}",
+            [answer["answer"] for answer in question["answers"]],
+            index=None,
+            key=f"question_{idx}"
+        )
+        if user_answer is not None:
+            if next(ans for ans in question["answers"] if ans["answer"] == user_answer)["correct"]:
+                correct_answers += 1
+
+    submitted = st.form_submit_button("제출")
+
+    if submitted:
+        if correct_answers == len(st.session_state.response_to_json["questions"]):
+            st.balloons()
+            st.success("축하합니다! 만점입니다!")
+        else:
+            st.error(f"{correct_answers}/{len(st.session_state.response_to_json['questions'])} 맞췄습니다. 다시 시도해보세요!")
