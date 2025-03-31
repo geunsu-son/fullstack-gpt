@@ -1,9 +1,14 @@
 env/
 .env
 files/
-.cache/
+.cache/embeddings/
+.cache/files/
+.cache/private_embeddings/
+.cache/private_files/
+.cache/quiz_files/
 .streamlit/
 .DS_Store
 falcon.bin
 __pycache__
 notebook_for_blog.ipynb
+.cursor
